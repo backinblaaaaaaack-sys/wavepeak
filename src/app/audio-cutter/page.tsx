@@ -3,6 +3,7 @@ import Link from "next/link";
 import AudioCutter from "@/components/audio-cutter/AudioCutter";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-cutter' },
   title: "Audio Cutter Online Free — Trim & Cut Any Audio File | Wavepeak",
   description: "Cut and trim any audio file online for free. Works in your browser — no upload, no server. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS.",
   openGraph: {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-converter' },
   title: "Audio Converter Online Free — Convert Any Audio Format | Wavepeak",
   description: "Convert any audio format online for free. MP3, WAV, FLAC, M4A, AAC, OGG, OPUS — all supported. Works in your browser, no upload required.",
   openGraph: {

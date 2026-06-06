@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/mp3-to-ogg' },
   title: "MP3 to OGG Converter Online Free | Wavepeak",
   description: "Convert MP3 to OGG online for free. Works in your browser — no upload, no server.",
   openGraph: {

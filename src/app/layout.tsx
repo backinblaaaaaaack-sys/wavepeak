@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://wavepeak-iota.vercel.app"),
   title: "Wavepeak — Free Online Audio Tools",
   description: "Convert, cut, merge and enhance audio files directly in your browser. No upload, no server. Free online audio tools.",
   openGraph: {

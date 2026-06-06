@@ -3,6 +3,7 @@ import Link from "next/link";
 import AudioMerger from "@/components/audio-merger/AudioMerger";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-merger' },
   title: "Audio Merger Online Free — Combine Multiple Audio Files | Wavepeak",
   description: "Merge and combine multiple audio files into one online for free. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS. Works in your browser — no upload, no server.",
   openGraph: {

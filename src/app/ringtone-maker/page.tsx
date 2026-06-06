@@ -3,6 +3,7 @@ import Link from "next/link";
 import RingtoneMaker from "@/components/ringtone-maker/RingtoneMaker";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/ringtone-maker' },
   title: "Ringtone Maker Online Free — Create Ringtones from Any Song | Wavepeak",
   description: "Create ringtones from any song online for free. Export as M4R for iPhone or MP3 for Android. Works in your browser — no upload, no server.",
   openGraph: {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import VolumeBooster from "@/components/volume-booster/VolumeBooster";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/volume-booster' },
   title: "Volume Booster Online Free — Increase Audio Volume Up to 500% | Wavepeak",
   description: "Boost the volume of any audio file online for free — up to 500%. Works in your browser, no upload required. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS.",
   openGraph: {

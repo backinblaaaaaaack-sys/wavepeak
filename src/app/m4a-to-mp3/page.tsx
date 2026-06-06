@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://wavepeak-iota.vercel.app/m4a-to-mp3' },
   title: "M4A to MP3 Converter Online Free | Wavepeak",
   description: "Convert M4A to MP3 online for free. Choose quality up to 320 kbps. Works in your browser — no upload, no server.",
   openGraph: {

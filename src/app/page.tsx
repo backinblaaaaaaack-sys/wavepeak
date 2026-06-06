@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PopularConversions from "@/components/popular-conversions/PopularConversions";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "https://wavepeak-iota.vercel.app" },
+};
 
 const tools = [
   {
