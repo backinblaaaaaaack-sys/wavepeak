@@ -98,10 +98,6 @@ export default function AudioCutter() {
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
 
-  // Keep refs in sync so drag handler always reads fresh values
-  const syncStart = (v: number) => { startTimeRef.current = v; setStartTime(v); };
-  const syncEnd   = (v: number) => { endTimeRef.current   = v; setEndTime(v); };
-  const syncDur   = (v: number) => { durationRef.current  = v; setDuration(v); };
   const [playRatio, setPlayRatio] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
@@ -154,9 +150,9 @@ export default function AudioCutter() {
     const peaks = extractPeaks(audioBuffer, peakCount);
     peaksRef.current = peaks;
 
-    syncDur(dur);
-    syncStart(0);
-    syncEnd(dur);
+    durationRef.current = dur; setDuration(dur);
+    startTimeRef.current = 0;  setStartTime(0);
+    endTimeRef.current = dur;  setEndTime(dur);
     setPlayRatio(null);
 
     if (canvas) drawCanvas(canvas, peaks, 0, 1, null);
@@ -206,14 +202,7 @@ export default function AudioCutter() {
     source.onended = () => { stopPlayback(); };
   }, [isPlaying, startTime, endTime, duration, stopPlayback]);
 
-  // Drag handle logic
-  const ratioFromMouseX = (clientX: number): number => {
-    const overlay = overlayRef.current;
-    if (!overlay) return 0;
-    const rect = overlay.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  };
-
+  // Drag handle logic — all refs, no closures over state
   const onHandleMouseDown = (target: DragTarget) => (e: React.MouseEvent) => {
     e.preventDefault();
     dragTargetRef.current = target;
@@ -223,15 +212,23 @@ export default function AudioCutter() {
     const target = dragTargetRef.current;
     const dur = durationRef.current;
     if (!target || dur === 0) return;
-    const ratio = ratioFromMouseX(e.clientX);
+
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const rect = overlay.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const t = ratio * dur;
+
     if (target === "start") {
-      syncStart(Math.min(t, endTimeRef.current - 0.1));
+      const v = Math.min(t, endTimeRef.current - 0.1);
+      startTimeRef.current = v;
+      setStartTime(v);
     } else {
-      syncEnd(Math.max(t, startTimeRef.current + 0.1));
+      const v = Math.max(t, startTimeRef.current + 0.1);
+      endTimeRef.current = v;
+      setEndTime(v);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // stable — reads only refs and stable setters
 
   const onOverlayMouseUp = useCallback(() => {
     dragTargetRef.current = null;
@@ -281,9 +278,9 @@ export default function AudioCutter() {
   const reset = () => {
     stopPlayback();
     setFile(null);
-    syncDur(0);
-    syncStart(0);
-    syncEnd(0);
+    durationRef.current = 0; setDuration(0);
+    startTimeRef.current = 0; setStartTime(0);
+    endTimeRef.current = 0;   setEndTime(0);
     setPlayRatio(null);
     setStatus("idle");
     setOutputUrl(null);
