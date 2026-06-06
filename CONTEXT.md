@@ -69,12 +69,12 @@ src/lib/waveform.ts — fmt(), extractPeaks(), drawCanvas().
 - /audio-cutter — обрезка аудио с waveform, drag-ручками и плеером
 - /ringtone-maker — создание рингтонов, лимит 40с, экспорт M4R + MP3
 - /volume-booster — усиление громкости 100–500%, индикатор клиппинга, FFmpeg volume filter
+- /audio-merger — склейка файлов, drag-reorder, FFmpeg filter_complex concat → MP3
 - SEO metadata для всех страниц
 - 22 страницы конвертера с предвыбранными форматами (все пары в src/lib/converters.ts)
 - Блок Popular Conversions на главной и /audio-converter
 
 ### Заглушки (нужно сделать) 🔲
-- /audio-merger — склейка файлов
 - /audio-speed-changer — изменение скорости
 
 ---
