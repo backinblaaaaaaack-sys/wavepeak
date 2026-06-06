@@ -52,6 +52,7 @@ MP3, WAV, FLAC, M4A, AAC, OGG, OPUS
 - Главная страница — сетка карточек всех инструментов (все кликабельны)
 - /audio-converter — рабочий универсальный конвертер
 - /audio-cutter — обрезка аудио с waveform, drag-ручками и плеером
+- /ringtone-maker — создание рингтонов, лимит 40с, экспорт M4R + MP3
 - SEO metadata для всех страниц
 - Страницы с предвыбранными форматами:
   - /flac-to-mp3
@@ -62,7 +63,6 @@ MP3, WAV, FLAC, M4A, AAC, OGG, OPUS
   - /mp3-to-flac
 
 ### Заглушки (нужно сделать) 🔲
-- /ringtone-maker — создание рингтонов (можно переиспользовать AudioCutter)
 - /volume-booster — усилитель громкости
 - /audio-merger — склейка файлов
 - /audio-speed-changer — изменение скорости
