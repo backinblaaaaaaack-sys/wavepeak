@@ -1,5 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Converter from "@/components/mp3-converter/Converter";
+
+export const metadata: Metadata = {
+  title: "MP3 Converter Online Free — Convert Any Audio to MP3 | Wavepeak",
+  description: "Convert MP3, WAV, FLAC, M4A, AAC, OGG, OPUS to MP3 online for free. Choose quality up to 320 kbps. Works in your browser — no upload, no server.",
+  openGraph: {
+    title: "MP3 Converter Online Free — Convert Any Audio to MP3 | Wavepeak",
+    description: "Convert any audio format to MP3 online. Choose quality up to 320 kbps. Free, fast, no upload required.",
+    url: "https://wavepeak-iota.vercel.app/mp3-converter",
+    siteName: "Wavepeak",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MP3 Converter Online Free | Wavepeak",
+    description: "Convert any audio format to MP3 online for free. Up to 320 kbps, works in browser.",
+  },
+};
 
 export default function Mp3ConverterPage() {
   return (
