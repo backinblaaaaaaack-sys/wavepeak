@@ -202,37 +202,36 @@ export default function AudioCutter() {
     source.onended = () => { stopPlayback(); };
   }, [isPlaying, startTime, endTime, duration, stopPlayback]);
 
-  // Drag handle logic — all refs, no closures over state
+  // Drag: attach listeners to window so handles don't block mousemove
   const onHandleMouseDown = (target: DragTarget) => (e: React.MouseEvent) => {
     e.preventDefault();
-    dragTargetRef.current = target;
+
+    const onMove = (ev: MouseEvent) => {
+      const overlay = overlayRef.current;
+      const dur = durationRef.current;
+      if (!overlay || dur === 0) return;
+      const rect = overlay.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      const t = ratio * dur;
+      if (target === "start") {
+        const v = Math.min(t, endTimeRef.current - 0.1);
+        startTimeRef.current = v;
+        setStartTime(v);
+      } else {
+        const v = Math.max(t, startTimeRef.current + 0.1);
+        endTimeRef.current = v;
+        setEndTime(v);
+      }
+    };
+
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
-
-  const onOverlayMouseMove = useCallback((e: React.MouseEvent) => {
-    const target = dragTargetRef.current;
-    const dur = durationRef.current;
-    if (!target || dur === 0) return;
-
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-    const rect = overlay.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const t = ratio * dur;
-
-    if (target === "start") {
-      const v = Math.min(t, endTimeRef.current - 0.1);
-      startTimeRef.current = v;
-      setStartTime(v);
-    } else {
-      const v = Math.max(t, startTimeRef.current + 0.1);
-      endTimeRef.current = v;
-      setEndTime(v);
-    }
-  }, []); // stable — reads only refs and stable setters
-
-  const onOverlayMouseUp = useCallback(() => {
-    dragTargetRef.current = null;
-  }, []);
 
   // FFmpeg
   const loadFFmpeg = async () => {
@@ -341,14 +340,8 @@ export default function AudioCutter() {
         <div className="relative rounded-xl overflow-visible border border-border/60 bg-zinc-900 select-none">
           <canvas ref={canvasRef} width={640} height={96} className="w-full h-24 block" />
 
-          {/* Drag overlay — captures mouse move/up */}
-          <div
-            ref={overlayRef}
-            className="absolute inset-0"
-            onMouseMove={onOverlayMouseMove}
-            onMouseUp={onOverlayMouseUp}
-            onMouseLeave={onOverlayMouseUp}
-          />
+          {/* Invisible overlay — used only for getBoundingClientRect */}
+          <div ref={overlayRef} className="absolute inset-0 pointer-events-none" />
 
           {/* Start handle */}
           <div
