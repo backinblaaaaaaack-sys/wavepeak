@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import PopularConversions from "@/components/popular-conversions/PopularConversions";
 
 const tools = [
   {
@@ -107,6 +108,11 @@ export default function Home() {
           ))}
         </div>
       </main>
+
+      {/* Popular Conversions */}
+      <div className="border-t border-border/50">
+        <PopularConversions />
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-border/50 px-6 py-6">

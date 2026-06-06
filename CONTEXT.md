@@ -70,13 +70,8 @@ src/lib/waveform.ts — fmt(), extractPeaks(), drawCanvas().
 - /ringtone-maker — создание рингтонов, лимит 40с, экспорт M4R + MP3
 - /volume-booster — усиление громкости 100–500%, индикатор клиппинга, FFmpeg volume filter
 - SEO metadata для всех страниц
-- Страницы с предвыбранными форматами:
-  - /flac-to-mp3
-  - /wav-to-mp3
-  - /m4a-to-mp3
-  - /ogg-to-mp3
-  - /mp3-to-wav
-  - /mp3-to-flac
+- 22 страницы конвертера с предвыбранными форматами (все пары в src/lib/converters.ts)
+- Блок Popular Conversions на главной и /audio-converter
 
 ### Заглушки (нужно сделать) 🔲
 - /audio-merger — склейка файлов

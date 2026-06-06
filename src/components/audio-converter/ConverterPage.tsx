@@ -1,14 +1,16 @@
 import Link from "next/link";
 import AudioConverter, { type AudioFormat } from "./AudioConverter";
+import PopularConversions from "@/components/popular-conversions/PopularConversions";
 
 interface Props {
   title: string;
   description: string;
   defaultFrom: AudioFormat;
   defaultTo: AudioFormat;
+  showPopular?: boolean;
 }
 
-export default function ConverterPage({ title, description, defaultFrom, defaultTo }: Props) {
+export default function ConverterPage({ title, description, defaultFrom, defaultTo, showPopular = false }: Props) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="border-b border-border/50 px-6 py-4">
@@ -26,6 +28,12 @@ export default function ConverterPage({ title, description, defaultFrom, default
         </div>
         <AudioConverter defaultFrom={defaultFrom} defaultTo={defaultTo} />
       </main>
+
+      {showPopular && (
+        <div className="border-t border-border/50">
+          <PopularConversions />
+        </div>
+      )}
 
       <footer className="border-t border-border/50 px-6 py-6">
         <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
