@@ -204,7 +204,7 @@ export default function AudioConverter({ defaultFrom = "MP3", defaultTo = "MP3" 
           </Select>
         </div>
 
-        {toFormat === "MP3" && (
+        {(toFormat === "MP3" || toFormat === "AAC") && (
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Quality</span>
             <Select value={bitrate} onValueChange={(v) => v && setBitrate(v)}>
