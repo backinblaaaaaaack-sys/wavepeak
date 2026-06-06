@@ -345,30 +345,28 @@ export default function AudioCutter() {
 
           {/* Start handle */}
           <div
-            className="absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize z-10"
-            style={{ left: `${startPct}%`, transform: "translateX(-50%)" }}
+            className="absolute top-0 bottom-0 flex items-center justify-center z-10"
+            style={{ left: `${startPct}%`, transform: "translateX(-50%)", cursor: "grab" }}
             onMouseDown={onHandleMouseDown("start")}
           >
-            <div className="w-0.5 h-full bg-white/90 absolute" />
-            <div className="relative w-4 h-7 rounded-sm bg-white/90 flex items-center justify-center shadow-md">
+            <div className="w-3 h-full bg-violet-500 opacity-90 rounded-sm flex items-center justify-center">
               <div className="flex gap-0.5">
-                <div className="w-px h-3 bg-zinc-500 rounded-full" />
-                <div className="w-px h-3 bg-zinc-500 rounded-full" />
+                <div className="w-px h-4 bg-white/70 rounded-full" />
+                <div className="w-px h-4 bg-white/70 rounded-full" />
               </div>
             </div>
           </div>
 
           {/* End handle */}
           <div
-            className="absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize z-10"
-            style={{ left: `${endPct}%`, transform: "translateX(-50%)" }}
+            className="absolute top-0 bottom-0 flex items-center justify-center z-10"
+            style={{ left: `${endPct}%`, transform: "translateX(-50%)", cursor: "grab" }}
             onMouseDown={onHandleMouseDown("end")}
           >
-            <div className="w-0.5 h-full bg-white/90 absolute" />
-            <div className="relative w-4 h-7 rounded-sm bg-white/90 flex items-center justify-center shadow-md">
+            <div className="w-3 h-full bg-violet-500 opacity-90 rounded-sm flex items-center justify-center">
               <div className="flex gap-0.5">
-                <div className="w-px h-3 bg-zinc-500 rounded-full" />
-                <div className="w-px h-3 bg-zinc-500 rounded-full" />
+                <div className="w-px h-4 bg-white/70 rounded-full" />
+                <div className="w-px h-4 bg-white/70 rounded-full" />
               </div>
             </div>
           </div>
