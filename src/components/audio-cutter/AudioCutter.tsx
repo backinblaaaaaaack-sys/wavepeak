@@ -7,45 +7,14 @@ import { Progress } from "@/components/ui/progress";
 
 const ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus";
 type Status = "idle" | "loading-ffmpeg" | "converting" | "done" | "error";
+type DragTarget = "start" | "end" | null;
 
-// Format seconds as m:ss
 function fmt(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-// Draw waveform on canvas, highlight selected region in violet
-function drawWaveform(
-  canvas: HTMLCanvasElement,
-  peaks: Float32Array,
-  startRatio: number,
-  endRatio: number
-) {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const { width: W, height: H } = canvas;
-  ctx.clearRect(0, 0, W, H);
-
-  const mid = H / 2;
-  const barW = 2;
-  const gap = 1;
-  const step = barW + gap;
-  const count = Math.floor(W / step);
-
-  for (let i = 0; i < count; i++) {
-    const ratio = i / count;
-    const peakIdx = Math.floor(ratio * peaks.length);
-    const amp = peaks[peakIdx] * mid * 0.9;
-    const x = i * step;
-
-    const inRange = ratio >= startRatio && ratio <= endRatio;
-    ctx.fillStyle = inRange ? "#7c3aed" : "#3f3f46";
-    ctx.fillRect(x, mid - amp, barW, amp * 2 || 1);
-  }
-}
-
-// Downsample AudioBuffer channel data to N peaks
 function extractPeaks(buffer: AudioBuffer, count: number): Float32Array {
   const data = buffer.getChannelData(0);
   const blockSize = Math.floor(data.length / count);
@@ -62,60 +31,203 @@ function extractPeaks(buffer: AudioBuffer, count: number): Float32Array {
   return peaks;
 }
 
+function drawCanvas(
+  canvas: HTMLCanvasElement,
+  peaks: Float32Array,
+  startRatio: number,
+  endRatio: number,
+  playRatio: number | null
+) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const mid = H / 2;
+  const barW = 2;
+  const gap = 1;
+  const step = barW + gap;
+  const count = Math.floor(W / step);
+
+  // Draw bars
+  for (let i = 0; i < count; i++) {
+    const ratio = i / count;
+    const peakIdx = Math.floor(ratio * peaks.length);
+    const amp = peaks[peakIdx] * mid * 0.85;
+    const x = i * step;
+    const inRange = ratio >= startRatio && ratio <= endRatio;
+    ctx.fillStyle = inRange ? "#7c3aed" : "#52525b";
+    ctx.fillRect(x, mid - amp, barW, amp * 2 || 1);
+  }
+
+  // Darken outside selection
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(0, 0, startRatio * W, H);
+  ctx.fillRect(endRatio * W, 0, W - endRatio * W, H);
+
+  // Playhead
+  if (playRatio !== null) {
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(playRatio * W, 0);
+    ctx.lineTo(playRatio * W, H);
+    ctx.stroke();
+  }
+}
+
 export default function AudioCutter() {
   const ffmpegRef = useRef<FFmpeg | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const peaksRef = useRef<Float32Array | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const playStartWallRef = useRef<number>(0);
+  const playOffsetRef = useRef<number>(0);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const dragTargetRef = useRef<DragTarget>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState(0);
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
+  const [playRatio, setPlayRatio] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [progress, setProgress] = useState(0);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   const [outputName, setOutputName] = useState("");
-  const [dragging, setDragging] = useState(false);
+  const [dragging, setDragging] = useState(false); // drop zone drag
 
-  // Redraw whenever handles change
-  useEffect(() => {
+  // Redraw canvas whenever selection or playhead changes
+  const redraw = useCallback((start: number, end: number, dur: number, pRatio: number | null) => {
     const canvas = canvasRef.current;
     const peaks = peaksRef.current;
-    if (!canvas || !peaks || duration === 0) return;
-    drawWaveform(canvas, peaks, startTime / duration, endTime / duration);
-  }, [startTime, endTime, duration]);
+    if (!canvas || !peaks || dur === 0) return;
+    drawCanvas(canvas, peaks, start / dur, end / dur, pRatio);
+  }, []);
+
+  useEffect(() => {
+    redraw(startTime, endTime, duration, playRatio);
+  }, [startTime, endTime, duration, playRatio, redraw]);
+
+  // Stop playback helper
+  const stopPlayback = useCallback(() => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    setIsPlaying(false);
+    setPlayRatio(null);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => { stopPlayback(); }, [stopPlayback]);
 
   const loadFile = useCallback(async (f: File) => {
+    stopPlayback();
     setFile(f);
     setStatus("idle");
     setOutputUrl(null);
     setProgress(0);
 
-    // Decode audio for waveform
     const arrayBuffer = await f.arrayBuffer();
-    const audioCtx = new AudioContext();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    const dur = audioBuffer.duration;
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext();
+    }
+    const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer.slice(0));
+    audioBufferRef.current = audioBuffer;
 
+    const dur = audioBuffer.duration;
     const canvas = canvasRef.current;
-    const peaks = extractPeaks(audioBuffer, canvas ? canvas.width / 3 : 400);
+    const peakCount = canvas ? Math.floor(canvas.width / 3) : 400;
+    const peaks = extractPeaks(audioBuffer, peakCount);
     peaksRef.current = peaks;
 
     setDuration(dur);
     setStartTime(0);
     setEndTime(dur);
+    setPlayRatio(null);
 
-    if (canvas) drawWaveform(canvas, peaks, 0, 1);
-    await audioCtx.close();
-  }, []);
+    if (canvas) drawCanvas(canvas, peaks, 0, 1, null);
+  }, [stopPlayback]);
 
-  const onDrop = useCallback((e: React.DragEvent) => {
+  const onFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     const f = e.dataTransfer.files[0];
     if (f) loadFile(f);
   }, [loadFile]);
 
+  // Play / Pause
+  const togglePlay = useCallback(() => {
+    if (isPlaying) { stopPlayback(); return; }
+
+    const audioBuffer = audioBufferRef.current;
+    const audioCtx = audioCtxRef.current;
+    if (!audioBuffer || !audioCtx) return;
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+
+    const segmentDuration = endTime - startTime;
+    playStartWallRef.current = audioCtx.currentTime;
+    playOffsetRef.current = startTime;
+
+    source.start(0, startTime, segmentDuration);
+    sourceRef.current = source;
+    setIsPlaying(true);
+
+    // Animate playhead
+    const tick = () => {
+      const elapsed = audioCtx.currentTime - playStartWallRef.current;
+      const currentPos = playOffsetRef.current + elapsed;
+
+      if (currentPos >= endTime) {
+        stopPlayback();
+        return;
+      }
+      setPlayRatio(currentPos / duration);
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+
+    source.onended = () => { stopPlayback(); };
+  }, [isPlaying, startTime, endTime, duration, stopPlayback]);
+
+  // Drag handle logic
+  const ratioFromMouseX = (clientX: number): number => {
+    const overlay = overlayRef.current;
+    if (!overlay) return 0;
+    const rect = overlay.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  };
+
+  const onHandleMouseDown = (target: DragTarget) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragTargetRef.current = target;
+  };
+
+  const onOverlayMouseMove = useCallback((e: React.MouseEvent) => {
+    const target = dragTargetRef.current;
+    if (!target || duration === 0) return;
+    const ratio = ratioFromMouseX(e.clientX);
+    const t = ratio * duration;
+    if (target === "start") {
+      setStartTime(Math.min(t, endTime - 0.1));
+    } else {
+      setEndTime(Math.max(t, startTime + 0.1));
+    }
+  }, [duration, startTime, endTime]);
+
+  const onOverlayMouseUp = useCallback(() => {
+    dragTargetRef.current = null;
+  }, []);
+
+  // FFmpeg
   const loadFFmpeg = async () => {
     if (ffmpegRef.current) return ffmpegRef.current;
     const ffmpeg = new FFmpeg();
@@ -130,16 +242,13 @@ export default function AudioCutter() {
 
   const cut = async () => {
     if (!file) return;
+    stopPlayback();
     setStatus("loading-ffmpeg");
     setProgress(0);
-
     try {
       const ffmpeg = await loadFFmpeg();
       setStatus("converting");
-
-      ffmpeg.on("progress", ({ progress: p }) => {
-        setProgress(Math.round(p * 100));
-      });
+      ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.round(p * 100)));
 
       const inputName = file.name.replace(/\s/g, "_");
       const ext = inputName.split(".").pop() ?? "mp3";
@@ -147,12 +256,7 @@ export default function AudioCutter() {
       setOutputName(outName);
 
       await ffmpeg.writeFile(inputName, await fetchFile(file));
-      await ffmpeg.exec([
-        "-ss", String(startTime.toFixed(3)),
-        "-to", String(endTime.toFixed(3)),
-        "-i", inputName,
-        outName,
-      ]);
+      await ffmpeg.exec(["-ss", startTime.toFixed(3), "-to", endTime.toFixed(3), "-i", inputName, outName]);
 
       const data = await ffmpeg.readFile(outName) as Uint8Array;
       const blob = new Blob([data.buffer as ArrayBuffer], { type: file.type });
@@ -165,15 +269,18 @@ export default function AudioCutter() {
   };
 
   const reset = () => {
+    stopPlayback();
     setFile(null);
     setDuration(0);
     setStartTime(0);
     setEndTime(0);
+    setPlayRatio(null);
     setStatus("idle");
     setOutputUrl(null);
     setOutputName("");
     setProgress(0);
     peaksRef.current = null;
+    audioBufferRef.current = null;
   };
 
   const busy = status === "loading-ffmpeg" || status === "converting";
@@ -190,32 +297,29 @@ export default function AudioCutter() {
         <div>
           <p className="text-sm text-muted-foreground mb-1">Ready to download</p>
           <p className="font-semibold text-foreground">{outputName}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {fmt(startTime)} → {fmt(endTime)}
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">{fmt(startTime)} → {fmt(endTime)}</p>
         </div>
         <a
           href={outputUrl}
           download={outputName}
-          className="w-full py-3.5 rounded-xl text-sm font-semibold text-center
-            bg-violet-600 text-white hover:bg-violet-500 transition-colors duration-200"
+          className="w-full py-3.5 rounded-xl text-sm font-semibold text-center bg-violet-600 text-white hover:bg-violet-500 transition-colors duration-200"
         >
           Download
         </a>
-        <button
-          onClick={reset}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <button onClick={reset} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           Cut another file
         </button>
       </div>
     );
   }
 
-  // — Waveform + controls —
+  // — Editor —
   if (file && duration > 0) {
+    const startPct = (startTime / duration) * 100;
+    const endPct = (endTime / duration) * 100;
+
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         {/* Compact file row */}
         <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
           <svg className="w-4 h-4 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -223,66 +327,83 @@ export default function AudioCutter() {
           </svg>
           <span className="flex-1 text-sm text-foreground truncate">{file.name}</span>
           <span className="text-xs text-muted-foreground shrink-0">{fmt(duration)}</span>
-          <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-1" aria-label="Remove file">×</button>
+          <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-1" aria-label="Remove">×</button>
         </div>
 
-        {/* Waveform canvas */}
-        <div className="rounded-xl overflow-hidden border border-border/60 bg-zinc-900">
-          <canvas
-            ref={canvasRef}
-            width={640}
-            height={96}
-            className="w-full h-24"
+        {/* Waveform + handles */}
+        <div className="relative rounded-xl overflow-hidden border border-border/60 bg-zinc-900 select-none">
+          <canvas ref={canvasRef} width={640} height={96} className="w-full h-24 block" />
+
+          {/* Drag overlay — captures mouse move/up */}
+          <div
+            ref={overlayRef}
+            className="absolute inset-0"
+            onMouseMove={onOverlayMouseMove}
+            onMouseUp={onOverlayMouseUp}
+            onMouseLeave={onOverlayMouseUp}
           />
-        </div>
 
-        {/* Dual range sliders */}
-        <div className="flex flex-col gap-3">
-          {/* Start */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground w-10 shrink-0">Start</span>
-            <input
-              type="range"
-              min={0}
-              max={duration}
-              step={0.01}
-              value={startTime}
-              onChange={(e) => {
-                const v = Math.min(Number(e.target.value), endTime - 0.1);
-                setStartTime(v);
-              }}
-              className="flex-1 accent-violet-500 cursor-pointer"
-            />
-            <span className="text-sm font-mono text-foreground w-10 text-right shrink-0">
-              {fmt(startTime)}
-            </span>
+          {/* Start handle */}
+          <div
+            className="absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize z-10"
+            style={{ left: `${startPct}%`, transform: "translateX(-50%)" }}
+            onMouseDown={onHandleMouseDown("start")}
+          >
+            <div className="w-0.5 h-full bg-white/90 absolute" />
+            <div className="relative w-4 h-7 rounded-sm bg-white/90 flex items-center justify-center shadow-md">
+              <div className="flex gap-0.5">
+                <div className="w-px h-3 bg-zinc-500 rounded-full" />
+                <div className="w-px h-3 bg-zinc-500 rounded-full" />
+              </div>
+            </div>
           </div>
 
-          {/* End */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground w-10 shrink-0">End</span>
-            <input
-              type="range"
-              min={0}
-              max={duration}
-              step={0.01}
-              value={endTime}
-              onChange={(e) => {
-                const v = Math.max(Number(e.target.value), startTime + 0.1);
-                setEndTime(v);
-              }}
-              className="flex-1 accent-violet-500 cursor-pointer"
-            />
-            <span className="text-sm font-mono text-foreground w-10 text-right shrink-0">
-              {fmt(endTime)}
-            </span>
+          {/* End handle */}
+          <div
+            className="absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize z-10"
+            style={{ left: `${endPct}%`, transform: "translateX(-50%)" }}
+            onMouseDown={onHandleMouseDown("end")}
+          >
+            <div className="w-0.5 h-full bg-white/90 absolute" />
+            <div className="relative w-4 h-7 rounded-sm bg-white/90 flex items-center justify-center shadow-md">
+              <div className="flex gap-0.5">
+                <div className="w-px h-3 bg-zinc-500 rounded-full" />
+                <div className="w-px h-3 bg-zinc-500 rounded-full" />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Duration info */}
-        <p className="text-xs text-muted-foreground text-center">
-          Selected: {fmt(endTime - startTime)} of {fmt(duration)}
-        </p>
+        {/* Timecodes */}
+        <div className="flex justify-between px-0.5">
+          <span className="text-xs font-mono text-violet-400">{fmt(startTime)}</span>
+          <span className="text-xs text-muted-foreground">
+            {fmt(endTime - startTime)} selected
+          </span>
+          <span className="text-xs font-mono text-violet-400">{fmt(endTime)}</span>
+        </div>
+
+        {/* Play / Pause */}
+        <button
+          onClick={togglePlay}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border/60 bg-card text-sm font-medium text-foreground hover:bg-accent/40 transition-colors"
+        >
+          {isPlaying ? (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+              Pause
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Play selection
+            </>
+          )}
+        </button>
 
         {/* Progress */}
         {busy && (
@@ -311,7 +432,7 @@ export default function AudioCutter() {
             ? "Loading FFmpeg…"
             : status === "converting"
             ? `Cutting… ${progress}%`
-            : `Cut ${fmt(startTime)} → ${fmt(endTime)}`}
+            : `Cut  ${fmt(startTime)} → ${fmt(endTime)}`}
         </button>
       </div>
     );
@@ -322,19 +443,11 @@ export default function AudioCutter() {
     <label
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
-      onDrop={onDrop}
+      onDrop={onFileDrop}
       className={`relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-8 py-20 cursor-pointer transition-all duration-200
-        ${dragging
-          ? "border-violet-500 bg-violet-500/10 scale-[1.01]"
-          : "border-border hover:border-violet-400 hover:bg-violet-500/5"
-        }`}
+        ${dragging ? "border-violet-500 bg-violet-500/10 scale-[1.01]" : "border-border hover:border-violet-400 hover:bg-violet-500/5"}`}
     >
-      <input
-        type="file"
-        accept={ACCEPT}
-        className="hidden"
-        onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])}
-      />
+      <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
       <div className={`flex items-center justify-center w-16 h-16 rounded-full transition-colors ${dragging ? "bg-violet-500/20" : "bg-muted"}`}>
         <svg className={`w-7 h-7 transition-colors ${dragging ? "text-violet-400" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
