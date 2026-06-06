@@ -34,13 +34,28 @@ MP3, WAV, FLAC, M4A, AAC, OGG, OPUS
 3. Обработка — прогресс на кнопке
 4. Готово — блок с галочкой, имя файла, кнопка Download, ссылка "... another file"
 
+### Общая библиотека waveform
+src/lib/waveform.ts — fmt(), extractPeaks(), drawCanvas().
+Используется в AudioCutter и RingtoneMaker. Любой новый инструмент с waveform берёт отсюда.
+
 ### Архитектура AudioCutter
 Компонент src/components/audio-cutter/AudioCutter.tsx.
 - Waveform: Web Audio API (AudioContext.decodeAudioData) → extractPeaks → canvas
-- Два range-слайдера (Start / End) с accent-violet-500
-- Подсветка выбранного диапазона на canvas фиолетовым (#7c3aed)
+- Drag-ручки поверх canvas: onMouseDown на handle → window.addEventListener(mousemove/mouseup)
+  (window-listeners чтобы handle не блокировал mousemove)
+- Refs для startTime/endTime/duration во время drag (без stale closure)
+- Подсветка выбранного диапазона фиолетовым (#7c3aed), затемнение снаружи
 - FFmpeg: -ss [start] -to [end] -i input output (ре-энкод для точности)
 - Выходной файл: то же расширение + суффикс _cut
+
+### Архитектура RingtoneMaker
+Компонент src/components/ringtone-maker/RingtoneMaker.tsx.
+- Тот же waveform + drag-ручки что в AudioCutter
+- Лимит 40с: ручки зажаты в диапазоне [end-40, end] и [start, start+40]
+  При попытке превысить — показывается hint "40 sec max for ringtones" на 2с
+- При загрузке файла endTime = min(duration, 40)
+- FFmpeg делает два прогона: AAC/mp4 → .m4r (iPhone), MP3 → .mp3 (Android)
+- Экран результата: две кнопки Download (M4R и MP3)
 
 ---
 
