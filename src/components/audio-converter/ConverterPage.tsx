@@ -8,9 +8,10 @@ interface Props {
   defaultFrom: AudioFormat;
   defaultTo: AudioFormat;
   showPopular?: boolean;
+  seoContent?: React.ReactNode;
 }
 
-export default function ConverterPage({ title, description, defaultFrom, defaultTo, showPopular = false }: Props) {
+export default function ConverterPage({ title, description, defaultFrom, defaultTo, showPopular = false, seoContent }: Props) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="border-b border-border/50 px-6 py-4">
@@ -27,6 +28,7 @@ export default function ConverterPage({ title, description, defaultFrom, default
           <p className="text-muted-foreground">{description}</p>
         </div>
         <AudioConverter defaultFrom={defaultFrom} defaultTo={defaultTo} />
+        {seoContent}
       </main>
 
       {showPopular && (
