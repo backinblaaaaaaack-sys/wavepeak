@@ -68,6 +68,7 @@ src/lib/waveform.ts — fmt(), extractPeaks(), drawCanvas().
 - /audio-converter — рабочий универсальный конвертер
 - /audio-cutter — обрезка аудио с waveform, drag-ручками и плеером
 - /ringtone-maker — создание рингтонов, лимит 40с, экспорт M4R + MP3
+- /volume-booster — усиление громкости 100–500%, индикатор клиппинга, FFmpeg volume filter
 - SEO metadata для всех страниц
 - Страницы с предвыбранными форматами:
   - /flac-to-mp3
@@ -78,7 +79,6 @@ src/lib/waveform.ts — fmt(), extractPeaks(), drawCanvas().
   - /mp3-to-flac
 
 ### Заглушки (нужно сделать) 🔲
-- /volume-booster — усилитель громкости
 - /audio-merger — склейка файлов
 - /audio-speed-changer — изменение скорости
 
