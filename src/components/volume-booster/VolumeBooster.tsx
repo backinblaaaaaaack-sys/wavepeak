@@ -13,28 +13,41 @@ const STEP = 10;
 
 type Status = "idle" | "loading-ffmpeg" | "boosting" | "done" | "error";
 
-function getLevelColor(vol: number): { bar: string; text: string; label: string } {
-  if (vol <= 200) return { bar: "bg-green-500",  text: "text-green-400",  label: "" };
-  if (vol <= 350) return { bar: "bg-yellow-500", text: "text-yellow-400", label: "Moderate boost — slight distortion possible" };
-  return              { bar: "bg-red-500",    text: "text-red-400",    label: "High boost — clipping likely on loud parts" };
+function getHint(vol: number): { text: string; color: string } {
+  if (vol <= 200) return { text: "Safe boost",                  color: "text-green-400" };
+  if (vol <= 350) return { text: "Loud, possible distortion",   color: "text-yellow-400" };
+  return               { text: "Warning: may clip",             color: "text-red-400" };
 }
 
 export default function VolumeBooster() {
-  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const ffmpegRef    = useRef<FFmpeg | null>(null);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
+  const audioDataRef = useRef<ArrayBuffer | null>(null);
 
-  const [file, setFile] = useState<File | null>(null);
-  const [volume, setVolume] = useState(DEFAULT_VOL);
-  const [status, setStatus] = useState<Status>("idle");
-  const [progress, setProgress] = useState(0);
-  const [outputUrl, setOutputUrl] = useState<string | null>(null);
-  const [outputName, setOutputName] = useState("");
+  const [file, setFile]               = useState<File | null>(null);
+  const [volume, setVolume]           = useState(DEFAULT_VOL);
+  const [status, setStatus]           = useState<Status>("idle");
+  const [progress, setProgress]       = useState(0);
+  const [outputUrl, setOutputUrl]     = useState<string | null>(null);
+  const [outputName, setOutputName]   = useState("");
   const [dropDragging, setDropDragging] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+
+  const stopPreview = useCallback(() => {
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    setIsPreviewing(false);
+  }, []);
 
   const handleFile = (f: File) => {
+    stopPreview();
     setFile(f);
     setOutputUrl(null);
     setStatus("idle");
     setProgress(0);
+    // Cache raw bytes for preview
+    f.arrayBuffer().then((buf) => { audioDataRef.current = buf; });
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -42,7 +55,33 @@ export default function VolumeBooster() {
     setDropDragging(false);
     const f = e.dataTransfer.files[0];
     if (f) handleFile(f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Preview via Web Audio API — gainNode, no FFmpeg
+  const togglePreview = async () => {
+    if (isPreviewing) { stopPreview(); return; }
+    const raw = audioDataRef.current;
+    if (!raw) return;
+
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext();
+    }
+    const ctx = audioCtxRef.current;
+    const audioBuffer = await ctx.decodeAudioData(raw.slice(0));
+
+    const gain = ctx.createGain();
+    gain.gain.value = volume / 100;
+    gain.connect(ctx.destination);
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(gain);
+    source.start();
+    source.onended = () => { setIsPreviewing(false); sourceRef.current = null; };
+    sourceRef.current = source;
+    setIsPreviewing(true);
+  };
 
   const loadFFmpeg = async () => {
     if (ffmpegRef.current) return ffmpegRef.current;
@@ -58,6 +97,7 @@ export default function VolumeBooster() {
 
   const boost = async () => {
     if (!file) return;
+    stopPreview();
     setStatus("loading-ffmpeg");
     setProgress(0);
     try {
@@ -71,7 +111,6 @@ export default function VolumeBooster() {
       setOutputName(outName);
 
       const multiplier = (volume / 100).toFixed(2);
-
       await ffmpeg.writeFile(inputName, await fetchFile(file));
       await ffmpeg.exec(["-i", inputName, "-filter:a", `volume=${multiplier}`, outName]);
 
@@ -86,17 +125,18 @@ export default function VolumeBooster() {
   };
 
   const reset = () => {
+    stopPreview();
     setFile(null);
     setVolume(DEFAULT_VOL);
     setStatus("idle");
     setOutputUrl(null);
     setOutputName("");
     setProgress(0);
+    audioDataRef.current = null;
   };
 
   const busy = status === "loading-ffmpeg" || status === "boosting";
-  const { bar, text, label } = getLevelColor(volume);
-  const fillPct = ((volume - MIN_VOL) / (MAX_VOL - MIN_VOL)) * 100;
+  const { text: hintText, color: hintColor } = getHint(volume);
 
   // — Result screen —
   if (status === "done" && outputUrl) {
@@ -138,7 +178,7 @@ export default function VolumeBooster() {
       >
         <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         <div className={`flex items-center justify-center w-16 h-16 rounded-full transition-colors ${dropDragging ? "bg-violet-500/20" : "bg-muted"}`}>
-          <svg className={`w-7 h-7 transition-colors ${dropDragging ? "text-violet-400" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className={`w-7 h-7 ${dropDragging ? "text-violet-400" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
         </div>
@@ -155,49 +195,37 @@ export default function VolumeBooster() {
   // — Controls —
   return (
     <div className="flex flex-col gap-5">
-      {/* Compact file row */}
+      {/* Compact file row with Preview button */}
       <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
         <svg className="w-4 h-4 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
         </svg>
         <span className="flex-1 text-sm text-foreground truncate">{file.name}</span>
+        {/* Preview button */}
+        <button
+          onClick={togglePreview}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors shrink-0"
+        >
+          {isPreviewing ? (
+            <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Stop</>
+          ) : (
+            <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Preview</>
+          )}
+        </button>
         <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-1" aria-label="Remove">×</button>
       </div>
 
-      {/* Volume control */}
+      {/* Volume control card */}
       <div className="rounded-2xl border border-border/60 bg-card px-6 py-5 flex flex-col gap-4">
         {/* Value display */}
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">Volume boost</p>
-            <p className={`text-4xl font-bold tabular-nums ${text}`}>{volume}<span className="text-2xl font-semibold ml-0.5">%</span></p>
+            <p className="text-4xl font-bold tabular-nums text-foreground">
+              {volume}<span className="text-2xl font-semibold ml-0.5 text-muted-foreground">%</span>
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mb-1">
-            ×{(volume / 100).toFixed(1)}
-          </p>
-        </div>
-
-        {/* Level indicator bar */}
-        <div className="flex flex-col gap-1.5">
-          <div className="relative h-2 rounded-full bg-zinc-800 overflow-hidden">
-            {/* Green zone 0–50% of bar (100–300%) */}
-            <div className="absolute inset-y-0 left-0 w-1/2 bg-green-500/30 rounded-full" />
-            {/* Yellow zone 50–62.5% (300–350%) */}
-            <div className="absolute inset-y-0 rounded-full bg-yellow-500/30" style={{ left: "50%", width: "12.5%" }} />
-            {/* Red zone 62.5–100% (350–500%) */}
-            <div className="absolute inset-y-0 rounded-full bg-red-500/30" style={{ left: "62.5%", right: 0 }} />
-            {/* Fill */}
-            <div
-              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-150 ${bar}`}
-              style={{ width: `${fillPct}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground/60">
-            <span>100%</span>
-            <span>200%</span>
-            <span>350%</span>
-            <span>500%</span>
-          </div>
+          <p className="text-sm text-muted-foreground mb-1">×{(volume / 100).toFixed(1)}</p>
         </div>
 
         {/* Slider */}
@@ -211,15 +239,8 @@ export default function VolumeBooster() {
           className="w-full accent-violet-500 cursor-pointer"
         />
 
-        {/* Warning */}
-        {label && (
-          <p className={`text-xs ${text} flex items-center gap-1.5`}>
-            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-            {label}
-          </p>
-        )}
+        {/* Hint line */}
+        <p className={`text-xs font-medium ${hintColor}`}>{hintText}</p>
       </div>
 
       {/* Progress */}
