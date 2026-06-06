@@ -31,24 +31,39 @@ const ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus";
 
 type Status = "idle" | "loading" | "converting" | "done" | "error";
 
+// Extension → format mapping for auto-detection
+const EXT_TO_FORMAT: Record<string, AudioFormat> = {
+  mp3: "MP3", wav: "WAV", flac: "FLAC",
+  m4a: "M4A", aac: "AAC", ogg: "OGG", opus: "OPUS",
+};
+
+function detectFormat(filename: string): AudioFormat | null {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return EXT_TO_FORMAT[ext] ?? null;
+}
+
 function buildFFmpegArgs(input: string, output: string, toFormat: AudioFormat, bitrate: string): string[] {
   const base = ["-i", input];
 
   switch (toFormat) {
     case "MP3":
-      return [...base, "-b:a", `${bitrate}k`, "-f", "mp3", output];
+      return [...base, "-c:a", "libmp3lame", "-b:a", `${bitrate}k`, output];
     case "WAV":
-      return [...base, "-f", "wav", output];
+      return [...base, "-c:a", "pcm_s16le", output];
     case "FLAC":
-      return [...base, "-f", "flac", output];
+      return [...base, "-c:a", "flac", output];
     case "M4A":
       return [...base, "-c:a", "aac", "-f", "mp4", output];
     case "AAC":
-      return [...base, "-c:a", "aac", "-f", "adts", output];
+      // adts = raw AAC stream, native encoder
+      return [...base, "-c:a", "aac", "-b:a", `${bitrate}k`, "-f", "adts", output];
     case "OGG":
-      return [...base, "-c:a", "libvorbis", "-f", "ogg", output];
+      // vorbis (native) — libvorbis not compiled in ffmpeg-core wasm
+      return [...base, "-c:a", "vorbis", "-f", "ogg", output];
     case "OPUS":
-      return [...base, "-c:a", "libopus", "-f", "opus", output];
+      // opus (native) — libopus not compiled in ffmpeg-core wasm
+      // Ogg container is the standard for .opus files
+      return [...base, "-c:a", "opus", "-f", "ogg", output];
   }
 }
 
@@ -86,6 +101,9 @@ export default function AudioConverter({ defaultFrom = "MP3", defaultTo = "MP3" 
     setOutputUrl(null);
     setStatus("idle");
     setProgress(0);
+    // Auto-detect From format by file extension
+    const detected = detectFormat(f.name);
+    if (detected) setFromFormat(detected);
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
