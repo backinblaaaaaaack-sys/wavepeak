@@ -212,9 +212,9 @@ export default function AudioConverter({ defaultFrom = "MP3", defaultTo = "MP3" 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="128">128 kbps</SelectItem>
-                <SelectItem value="192">192 kbps</SelectItem>
-                <SelectItem value="320">320 kbps (best)</SelectItem>
+                <SelectItem value="128">128 kbps — Good</SelectItem>
+                <SelectItem value="192">192 kbps — Better</SelectItem>
+                <SelectItem value="320">320 kbps — Best</SelectItem>
               </SelectContent>
             </Select>
           </div>
