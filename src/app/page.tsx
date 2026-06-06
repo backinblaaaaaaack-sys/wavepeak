@@ -1,65 +1,119 @@
-import Image from "next/image";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+const tools = [
+  {
+    title: "MP3 Converter",
+    description: "Convert any audio file to MP3 format quickly and easily.",
+    badge: "Popular",
+    href: "/mp3-converter",
+  },
+  {
+    title: "Audio Cutter",
+    description: "Trim and cut your audio files to the exact length you need.",
+    badge: null,
+    href: "/audio-cutter",
+  },
+  {
+    title: "Ringtone Maker",
+    description: "Create custom ringtones from any song or audio clip.",
+    badge: null,
+    href: "/ringtone-maker",
+  },
+  {
+    title: "Volume Booster",
+    description: "Increase the volume of your audio files without quality loss.",
+    badge: null,
+    href: "/volume-booster",
+  },
+  {
+    title: "WAV to MP3",
+    description: "Convert WAV files to compressed MP3 format instantly.",
+    badge: null,
+    href: "/wav-to-mp3",
+  },
+  {
+    title: "FLAC to MP3",
+    description: "Convert lossless FLAC audio to lightweight MP3.",
+    badge: null,
+    href: "/flac-to-mp3",
+  },
+  {
+    title: "M4A to MP3",
+    description: "Convert M4A and Apple audio formats to universal MP3.",
+    badge: null,
+    href: "/m4a-to-mp3",
+  },
+  {
+    title: "Audio Merger",
+    description: "Combine multiple audio files into one seamless track.",
+    badge: null,
+    href: "/audio-merger",
+  },
+  {
+    title: "Audio Speed Changer",
+    description: "Speed up or slow down audio without changing the pitch.",
+    badge: null,
+    href: "/audio-speed-changer",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
+      <header className="border-b border-border/50 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <span className="text-xl font-semibold tracking-tight text-foreground">
+            Wave<span className="text-muted-foreground">peak</span>
+          </span>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-16">
+        <div className="text-center mb-14">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl mb-4">
+            Free Online Audio Tools
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+            Convert, cut, merge and enhance your audio files — all in the browser, no upload required.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Tools grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tools.map((tool) => (
+            <Card
+              key={tool.title}
+              className="group relative cursor-pointer border-border/60 bg-card hover:border-border transition-colors duration-200 hover:bg-accent/30"
+            >
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base font-semibold text-card-foreground group-hover:text-foreground transition-colors">
+                    {tool.title}
+                  </CardTitle>
+                  {tool.badge && (
+                    <Badge variant="secondary" className="text-xs shrink-0">
+                      {tool.badge}
+                    </Badge>
+                  )}
+                </div>
+                <CardDescription className="text-sm text-muted-foreground leading-relaxed">
+                  {tool.description}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border/50 px-6 py-6">
+        <div className="max-w-6xl mx-auto text-center text-sm text-muted-foreground">
+          © {new Date().getFullYear()} Wavepeak. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }
