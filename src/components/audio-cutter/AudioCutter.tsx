@@ -331,7 +331,7 @@ export default function AudioCutter() {
         </div>
 
         {/* Waveform + handles */}
-        <div className="relative rounded-xl overflow-hidden border border-border/60 bg-zinc-900 select-none">
+        <div className="relative rounded-xl overflow-visible border border-border/60 bg-zinc-900 select-none">
           <canvas ref={canvasRef} width={640} height={96} className="w-full h-24 block" />
 
           {/* Drag overlay — captures mouse move/up */}
@@ -349,10 +349,10 @@ export default function AudioCutter() {
             style={{ left: `${startPct}%`, transform: "translateX(-50%)", cursor: "grab" }}
             onMouseDown={onHandleMouseDown("start")}
           >
-            <div className="w-3 h-full bg-violet-500 opacity-90 rounded-sm flex items-center justify-center">
+            <div className="w-3 bg-white/95 rounded-sm flex items-center justify-center shadow-md shadow-black/40" style={{ height: "calc(100% + 16px)" }}>
               <div className="flex gap-0.5">
-                <div className="w-px h-4 bg-white/70 rounded-full" />
-                <div className="w-px h-4 bg-white/70 rounded-full" />
+                <div className="w-px h-4 bg-zinc-400 rounded-full" />
+                <div className="w-px h-4 bg-zinc-400 rounded-full" />
               </div>
             </div>
           </div>
@@ -363,10 +363,10 @@ export default function AudioCutter() {
             style={{ left: `${endPct}%`, transform: "translateX(-50%)", cursor: "grab" }}
             onMouseDown={onHandleMouseDown("end")}
           >
-            <div className="w-3 h-full bg-violet-500 opacity-90 rounded-sm flex items-center justify-center">
+            <div className="w-3 bg-white/95 rounded-sm flex items-center justify-center shadow-md shadow-black/40" style={{ height: "calc(100% + 16px)" }}>
               <div className="flex gap-0.5">
-                <div className="w-px h-4 bg-white/70 rounded-full" />
-                <div className="w-px h-4 bg-white/70 rounded-full" />
+                <div className="w-px h-4 bg-zinc-400 rounded-full" />
+                <div className="w-px h-4 bg-zinc-400 rounded-full" />
               </div>
             </div>
           </div>
