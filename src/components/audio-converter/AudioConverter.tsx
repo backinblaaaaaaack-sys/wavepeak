@@ -1,0 +1,253 @@
+"use client";
+
+import { useRef, useState, useCallback } from "react";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export type AudioFormat = "MP3" | "WAV" | "FLAC" | "M4A" | "AAC" | "OGG" | "OPUS";
+
+const FORMATS: AudioFormat[] = ["MP3", "WAV", "FLAC", "M4A", "AAC", "OGG", "OPUS"];
+
+const FORMAT_EXT: Record<AudioFormat, string> = {
+  MP3: "mp3",
+  WAV: "wav",
+  FLAC: "flac",
+  M4A: "m4a",
+  AAC: "aac",
+  OGG: "ogg",
+  OPUS: "opus",
+};
+
+const ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus";
+
+type Status = "idle" | "loading" | "converting" | "done" | "error";
+
+function buildFFmpegArgs(input: string, output: string, toFormat: AudioFormat, bitrate: string): string[] {
+  const base = ["-i", input];
+
+  switch (toFormat) {
+    case "MP3":
+      return [...base, "-b:a", `${bitrate}k`, "-f", "mp3", output];
+    case "WAV":
+      return [...base, "-f", "wav", output];
+    case "FLAC":
+      return [...base, "-f", "flac", output];
+    case "M4A":
+      return [...base, "-c:a", "aac", "-f", "mp4", output];
+    case "AAC":
+      return [...base, "-c:a", "aac", "-f", "adts", output];
+    case "OGG":
+      return [...base, "-c:a", "libvorbis", "-f", "ogg", output];
+    case "OPUS":
+      return [...base, "-c:a", "libopus", "-f", "opus", output];
+  }
+}
+
+interface Props {
+  defaultFrom?: AudioFormat;
+  defaultTo?: AudioFormat;
+}
+
+export default function AudioConverter({ defaultFrom = "MP3", defaultTo = "MP3" }: Props) {
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [fromFormat, setFromFormat] = useState<AudioFormat>(defaultFrom);
+  const [toFormat, setToFormat] = useState<AudioFormat>(defaultTo);
+  const [bitrate, setBitrate] = useState("192");
+  const [status, setStatus] = useState<Status>("idle");
+  const [progress, setProgress] = useState(0);
+  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [outputName, setOutputName] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  const loadFFmpeg = async () => {
+    if (ffmpegRef.current) return ffmpegRef.current;
+    const ffmpeg = new FFmpeg();
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+    ffmpegRef.current = ffmpeg;
+    return ffmpeg;
+  };
+
+  const handleFile = (f: File) => {
+    setFile(f);
+    setOutputUrl(null);
+    setStatus("idle");
+    setProgress(0);
+  };
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  }, []);
+
+  const convert = async () => {
+    if (!file) return;
+    setStatus("loading");
+    setProgress(0);
+    setOutputUrl(null);
+
+    try {
+      const ffmpeg = await loadFFmpeg();
+      setStatus("converting");
+
+      ffmpeg.on("progress", ({ progress: p }) => {
+        setProgress(Math.round(p * 100));
+      });
+
+      const inputName = file.name.replace(/\s/g, "_");
+      const ext = FORMAT_EXT[toFormat];
+      const outName = inputName.replace(/\.[^.]+$/, "") + "." + ext;
+      setOutputName(outName);
+
+      await ffmpeg.writeFile(inputName, await fetchFile(file));
+      const args = buildFFmpegArgs(inputName, outName, toFormat, bitrate);
+      await ffmpeg.exec(args);
+
+      const data = await ffmpeg.readFile(outName) as Uint8Array;
+      const blob = new Blob([data.buffer as ArrayBuffer], { type: `audio/${ext}` });
+      setOutputUrl(URL.createObjectURL(blob));
+      setStatus("done");
+      setProgress(100);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const busy = status === "loading" || status === "converting";
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Format selectors */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">From</span>
+          <Select value={fromFormat} onValueChange={(v) => setFromFormat(v as AudioFormat)}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FORMATS.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <span className="text-muted-foreground mt-5">→</span>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">To</span>
+          <Select value={toFormat} onValueChange={(v) => setToFormat(v as AudioFormat)}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FORMATS.map((f) => (
+                <SelectItem key={f} value={f}>{f}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {toFormat === "MP3" && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Quality</span>
+            <Select value={bitrate} onValueChange={(v) => v && setBitrate(v)}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="128">128 kbps</SelectItem>
+                <SelectItem value="192">192 kbps</SelectItem>
+                <SelectItem value="320">320 kbps (best)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      {/* Drop zone */}
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-14 cursor-pointer transition-colors
+          ${dragging ? "border-primary bg-accent/40" : "border-border/60 hover:border-border hover:bg-accent/20"}`}
+      >
+        <input
+          type="file"
+          accept={ACCEPT}
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+        <div className="text-4xl text-muted-foreground">🎵</div>
+        {file ? (
+          <p className="text-sm font-medium text-foreground">{file.name}</p>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-foreground">
+              Drag & drop audio file or click to browse
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {FORMATS.join(", ")}
+            </p>
+          </>
+        )}
+      </label>
+
+      {/* Convert button */}
+      <Button onClick={convert} disabled={!file || busy} className="w-full">
+        {status === "loading"
+          ? "Loading FFmpeg…"
+          : status === "converting"
+          ? "Converting…"
+          : `Convert to ${toFormat}`}
+      </Button>
+
+      {/* Progress */}
+      {busy && (
+        <div className="flex flex-col gap-2">
+          <Progress value={status === "loading" ? null : progress} className="h-2" />
+          <p className="text-xs text-muted-foreground text-right">
+            {status === "loading" ? "Loading engine…" : `${progress}%`}
+          </p>
+        </div>
+      )}
+
+      {/* Error */}
+      {status === "error" && (
+        <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
+      )}
+
+      {/* Download */}
+      {status === "done" && outputUrl && (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border/60 bg-card px-6 py-6">
+          <p className="text-sm text-muted-foreground">Conversion complete</p>
+          <p className="font-medium text-foreground">{outputName}</p>
+          <a
+            href={outputUrl}
+            download={outputName}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+          >
+            Download {toFormat}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
