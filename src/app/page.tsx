@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -84,26 +85,25 @@ export default function Home() {
         {/* Tools grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {tools.map((tool) => (
-            <Card
-              key={tool.title}
-              className="group relative cursor-pointer border-border/60 bg-card hover:border-border transition-colors duration-200 hover:bg-accent/30"
-            >
-              <CardHeader className="pb-4">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base font-semibold text-card-foreground group-hover:text-foreground transition-colors">
-                    {tool.title}
-                  </CardTitle>
-                  {tool.badge && (
-                    <Badge variant="secondary" className="text-xs shrink-0">
-                      {tool.badge}
-                    </Badge>
-                  )}
-                </div>
-                <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-                  {tool.description}
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <Link key={tool.title} href={tool.href}>
+              <Card className="group relative cursor-pointer border-border/60 bg-card hover:border-border transition-colors duration-200 hover:bg-accent/30 h-full">
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base font-semibold text-card-foreground group-hover:text-foreground transition-colors">
+                      {tool.title}
+                    </CardTitle>
+                    {tool.badge && (
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {tool.badge}
+                      </Badge>
+                    )}
+                  </div>
+                  <CardDescription className="text-sm text-muted-foreground leading-relaxed">
+                    {tool.description}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
           ))}
         </div>
       </main>
