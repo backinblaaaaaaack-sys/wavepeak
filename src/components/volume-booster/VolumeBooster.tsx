@@ -23,6 +23,7 @@ export default function VolumeBooster() {
   const ffmpegRef    = useRef<FFmpeg | null>(null);
   const audioCtxRef  = useRef<AudioContext | null>(null);
   const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
+  const gainNodeRef  = useRef<GainNode | null>(null);
   const audioDataRef = useRef<ArrayBuffer | null>(null);
 
   const [file, setFile]               = useState<File | null>(null);
@@ -32,21 +33,21 @@ export default function VolumeBooster() {
   const [outputUrl, setOutputUrl]     = useState<string | null>(null);
   const [outputName, setOutputName]   = useState("");
   const [dropDragging, setDropDragging] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isPlaying, setIsPlaying]     = useState(false);
 
-  const stopPreview = useCallback(() => {
+  const stopPlayback = useCallback(() => {
     try { sourceRef.current?.stop(); } catch {}
     sourceRef.current = null;
-    setIsPreviewing(false);
+    gainNodeRef.current = null;
+    setIsPlaying(false);
   }, []);
 
   const handleFile = (f: File) => {
-    stopPreview();
+    stopPlayback();
     setFile(f);
     setOutputUrl(null);
     setStatus("idle");
     setProgress(0);
-    // Cache raw bytes for preview
     f.arrayBuffer().then((buf) => { audioDataRef.current = buf; });
   };
 
@@ -58,9 +59,9 @@ export default function VolumeBooster() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Preview via Web Audio API — gainNode, no FFmpeg
-  const togglePreview = async () => {
-    if (isPreviewing) { stopPreview(); return; }
+  // Play / Pause via Web Audio API + GainNode
+  const togglePlay = async () => {
+    if (isPlaying) { stopPlayback(); return; }
     const raw = audioDataRef.current;
     if (!raw) return;
 
@@ -72,15 +73,16 @@ export default function VolumeBooster() {
 
     const gain = ctx.createGain();
     gain.gain.value = volume / 100;
+    gainNodeRef.current = gain;
     gain.connect(ctx.destination);
 
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(gain);
     source.start();
-    source.onended = () => { setIsPreviewing(false); sourceRef.current = null; };
+    source.onended = () => { setIsPlaying(false); sourceRef.current = null; gainNodeRef.current = null; };
     sourceRef.current = source;
-    setIsPreviewing(true);
+    setIsPlaying(true);
   };
 
   const loadFFmpeg = async () => {
@@ -97,7 +99,7 @@ export default function VolumeBooster() {
 
   const boost = async () => {
     if (!file) return;
-    stopPreview();
+    stopPlayback();
     setStatus("loading-ffmpeg");
     setProgress(0);
     try {
@@ -125,7 +127,7 @@ export default function VolumeBooster() {
   };
 
   const reset = () => {
-    stopPreview();
+    stopPlayback();
     setFile(null);
     setVolume(DEFAULT_VOL);
     setStatus("idle");
@@ -227,48 +229,28 @@ export default function VolumeBooster() {
           onChange={(e) => {
             const v = Number(e.target.value);
             setVolume(v);
-            // Live preview: restart with new gain if already playing
-            if (isPreviewing) {
-              try { sourceRef.current?.stop(); } catch {}
-              sourceRef.current = null;
-              setIsPreviewing(false);
-              // small delay so state settles, then restart
-              setTimeout(() => {
-                const raw = audioDataRef.current;
-                if (!raw || !audioCtxRef.current) return;
-                audioCtxRef.current.decodeAudioData(raw.slice(0)).then((audioBuffer) => {
-                  const ctx = audioCtxRef.current!;
-                  const gain = ctx.createGain();
-                  gain.gain.value = v / 100;
-                  gain.connect(ctx.destination);
-                  const source = ctx.createBufferSource();
-                  source.buffer = audioBuffer;
-                  source.connect(gain);
-                  source.start();
-                  source.onended = () => { setIsPreviewing(false); sourceRef.current = null; };
-                  sourceRef.current = source;
-                  setIsPreviewing(true);
-                });
-              }, 50);
+            // Live update: just change gain value, no restart needed
+            if (gainNodeRef.current) {
+              gainNodeRef.current.gain.value = v / 100;
             }
           }}
           className="w-full accent-violet-500 cursor-pointer"
         />
 
-        {/* Hint + Preview link */}
-        <div className="flex items-center justify-between">
-          <p className={`text-xs font-medium ${hintColor}`}>{hintText}</p>
-          <button
-            onClick={togglePreview}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {isPreviewing ? (
-              <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Stop</>
-            ) : (
-              <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Preview</>
-            )}
-          </button>
-        </div>
+        {/* Hint */}
+        <p className={`text-xs font-medium ${hintColor}`}>{hintText}</p>
+
+        {/* Play / Pause button */}
+        <button
+          onClick={togglePlay}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border/60 bg-background text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+        >
+          {isPlaying ? (
+            <><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Pause</>
+          ) : (
+            <><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Play</>
+          )}
+        </button>
       </div>
 
       {/* Progress */}
