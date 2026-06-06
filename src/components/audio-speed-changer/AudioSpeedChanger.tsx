@@ -1,0 +1,316 @@
+"use client";
+
+import { useRef, useState, useCallback } from "react";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { Progress } from "@/components/ui/progress";
+
+const ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus";
+const MIN_SPEED = 0.5;
+const MAX_SPEED = 3.0;
+const DEFAULT_SPEED = 1.0;
+const STEP = 0.1;
+
+const PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+type Status = "idle" | "loading-ffmpeg" | "processing" | "done" | "error";
+
+/** Build atempo filter string — chains filters if speed > 2.0 or < 0.5 */
+function buildAtempo(speed: number): string {
+  // atempo supports 0.5–2.0 per instance; chain for values outside range
+  if (speed >= 0.5 && speed <= 2.0) return `atempo=${speed.toFixed(2)}`;
+  // speed > 2.0: factor into two atempo values whose product = speed
+  if (speed > 2.0) {
+    const a = 2.0;
+    const b = speed / a;
+    return `atempo=${a.toFixed(2)},atempo=${b.toFixed(2)}`;
+  }
+  // speed < 0.5: chain two 0.5-ish values
+  const a = Math.sqrt(speed);
+  return `atempo=${a.toFixed(4)},atempo=${a.toFixed(4)}`;
+}
+
+function speedLabel(speed: number): string {
+  if (speed < 1.0) return "Slow down";
+  if (speed > 1.0) return "Speed up";
+  return "Original speed";
+}
+
+export default function AudioSpeedChanger() {
+  const ffmpegRef    = useRef<FFmpeg | null>(null);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  const sourceRef    = useRef<AudioBufferSourceNode | null>(null);
+  const audioDataRef = useRef<ArrayBuffer | null>(null);
+
+  const [file, setFile]           = useState<File | null>(null);
+  const [speed, setSpeed]         = useState(DEFAULT_SPEED);
+  const [status, setStatus]       = useState<Status>("idle");
+  const [progress, setProgress]   = useState(0);
+  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [outputName, setOutputName] = useState("");
+  const [dropDragging, setDropDragging] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const stopPlayback = useCallback(() => {
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current = null;
+    setIsPlaying(false);
+  }, []);
+
+  const handleFile = (f: File) => {
+    stopPlayback();
+    setFile(f);
+    setOutputUrl(null);
+    setStatus("idle");
+    setProgress(0);
+    f.arrayBuffer().then((buf) => { audioDataRef.current = buf; });
+  };
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDropDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Play / Pause — Web Audio API, no FFmpeg
+  const togglePlay = async () => {
+    if (isPlaying) { stopPlayback(); return; }
+    const raw = audioDataRef.current;
+    if (!raw) return;
+
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioContext();
+    }
+    const ctx = audioCtxRef.current;
+    const audioBuffer = await ctx.decodeAudioData(raw.slice(0));
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = speed;
+    source.connect(ctx.destination);
+    source.start();
+    source.onended = () => { setIsPlaying(false); sourceRef.current = null; };
+    sourceRef.current = source;
+    setIsPlaying(true);
+  };
+
+  // Apply speed change to slider — also update live playback
+  const applySpeed = (v: number) => {
+    setSpeed(v);
+    if (sourceRef.current) {
+      sourceRef.current.playbackRate.value = v;
+    }
+  };
+
+  // FFmpeg processing
+  const loadFFmpeg = async () => {
+    if (ffmpegRef.current) return ffmpegRef.current;
+    const ffmpeg = new FFmpeg();
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+    ffmpegRef.current = ffmpeg;
+    return ffmpeg;
+  };
+
+  const changeSpeed = async () => {
+    if (!file) return;
+    stopPlayback();
+    setStatus("loading-ffmpeg");
+    setProgress(0);
+    try {
+      const ffmpeg = await loadFFmpeg();
+      setStatus("processing");
+      ffmpeg.on("progress", ({ progress: p }) => setProgress(Math.round(p * 100)));
+
+      const inputName = file.name.replace(/\s/g, "_");
+      const ext = inputName.split(".").pop() ?? "mp3";
+      const suffix = speed < 1 ? `_${speed}x` : `_${speed}x`;
+      const outName = inputName.replace(/\.[^.]+$/, "") + suffix.replace(".", "_") + `.${ext}`;
+      setOutputName(outName);
+
+      const atempo = buildAtempo(speed);
+      await ffmpeg.writeFile(inputName, await fetchFile(file));
+      await ffmpeg.exec(["-i", inputName, "-filter:a", atempo, outName]);
+
+      const data = await ffmpeg.readFile(outName) as Uint8Array;
+      const blob = new Blob([data.buffer as ArrayBuffer], { type: file.type });
+      setOutputUrl(URL.createObjectURL(blob));
+      setStatus("done");
+      setProgress(100);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const reset = () => {
+    stopPlayback();
+    setFile(null);
+    setSpeed(DEFAULT_SPEED);
+    setStatus("idle");
+    setOutputUrl(null);
+    setOutputName("");
+    setProgress(0);
+    audioDataRef.current = null;
+  };
+
+  const busy = status === "loading-ffmpeg" || status === "processing";
+
+  // — Result screen —
+  if (status === "done" && outputUrl) {
+    return (
+      <div className="flex flex-col items-center gap-6 rounded-2xl border border-border/60 bg-card px-8 py-12 text-center">
+        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/15">
+          <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground mb-1">Speed changed to {speed}x</p>
+          <p className="font-semibold text-foreground">{outputName}</p>
+        </div>
+        <a
+          href={outputUrl}
+          download={outputName}
+          className="w-full py-3.5 rounded-xl text-sm font-semibold text-center
+            bg-violet-600 text-white hover:bg-violet-500 transition-colors duration-200"
+        >
+          Download
+        </a>
+        <button onClick={reset} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          Change another file
+        </button>
+      </div>
+    );
+  }
+
+  // — Drop zone —
+  if (!file) {
+    return (
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDropDragging(true); }}
+        onDragLeave={() => setDropDragging(false)}
+        onDrop={onDrop}
+        className={`relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-8 py-20 cursor-pointer transition-all duration-200
+          ${dropDragging ? "border-violet-500 bg-violet-500/10 scale-[1.01]" : "border-border hover:border-violet-400 hover:bg-violet-500/5"}`}
+      >
+        <input type="file" accept={ACCEPT} className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+        <div className={`flex items-center justify-center w-16 h-16 rounded-full transition-colors ${dropDragging ? "bg-violet-500/20" : "bg-muted"}`}>
+          <svg className={`w-7 h-7 ${dropDragging ? "text-violet-400" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-semibold text-foreground">
+            {dropDragging ? "Drop your file here" : "Drag & drop or click to browse"}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">MP3 · WAV · FLAC · M4A · AAC · OGG · OPUS</p>
+        </div>
+      </label>
+    );
+  }
+
+  // — Controls —
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Compact file row */}
+      <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
+        <svg className="w-4 h-4 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+        </svg>
+        <span className="flex-1 text-sm text-foreground truncate">{file.name}</span>
+        <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-1" aria-label="Remove">×</button>
+      </div>
+
+      {/* Speed control card */}
+      <div className="rounded-2xl border border-border/60 bg-card px-6 py-5 flex flex-col gap-4">
+        {/* Value display */}
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground mb-0.5">Playback speed</p>
+            <p className="text-4xl font-bold tabular-nums text-foreground">
+              {speed.toFixed(1)}<span className="text-2xl font-semibold ml-0.5 text-muted-foreground">x</span>
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground mb-1">{speedLabel(speed)}</p>
+        </div>
+
+        {/* Slider */}
+        <input
+          type="range"
+          min={MIN_SPEED}
+          max={MAX_SPEED}
+          step={STEP}
+          value={speed}
+          onChange={(e) => applySpeed(Number(e.target.value))}
+          className="w-full accent-violet-500 cursor-pointer"
+        />
+
+        {/* Preset buttons */}
+        <div className="flex gap-2 flex-wrap">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset}
+              onClick={() => applySpeed(preset)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                ${Math.abs(speed - preset) < 0.01
+                  ? "bg-violet-600 text-white"
+                  : "border border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
+            >
+              {preset}x
+            </button>
+          ))}
+        </div>
+
+        {/* Play / Pause */}
+        <button
+          onClick={togglePlay}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border/60 bg-background text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+        >
+          {isPlaying ? (
+            <><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Pause</>
+          ) : (
+            <><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Play at {speed.toFixed(1)}x</>
+          )}
+        </button>
+      </div>
+
+      {/* Progress */}
+      {busy && (
+        <div className="flex flex-col gap-2">
+          <Progress value={status === "loading-ffmpeg" ? null : progress} className="h-2" />
+          <p className="text-xs text-muted-foreground text-right">
+            {status === "loading-ffmpeg" ? "Loading engine…" : `${progress}%`}
+          </p>
+        </div>
+      )}
+
+      {status === "error" && (
+        <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
+      )}
+
+      {/* Change Speed button */}
+      <button
+        onClick={changeSpeed}
+        disabled={busy || speed === 1.0}
+        className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-200
+          bg-violet-600 text-white hover:bg-violet-500 active:scale-[0.99]
+          disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-violet-600"
+      >
+        {status === "loading-ffmpeg"
+          ? "Loading FFmpeg…"
+          : status === "processing"
+          ? `Processing… ${progress}%`
+          : speed === 1.0
+          ? "Select a different speed"
+          : `Change Speed to ${speed.toFixed(1)}x`}
+      </button>
+    </div>
+  );
+}

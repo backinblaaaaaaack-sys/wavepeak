@@ -70,14 +70,14 @@ src/lib/waveform.ts — fmt(), extractPeaks(), drawCanvas().
 - /ringtone-maker — создание рингтонов, лимит 40с, экспорт M4R + MP3
 - /volume-booster — усиление громкости 100–500%, индикатор клиппинга, FFmpeg volume filter
 - /audio-merger — склейка файлов, drag-reorder, FFmpeg filter_complex concat → MP3
+- /audio-speed-changer — скорость 0.5x–3.0x, пресеты, live preview, FFmpeg atempo
 - SEO metadata для всех страниц
 - 22 страницы конвертера с предвыбранными форматами (все пары в src/lib/converters.ts)
 - Блок Popular Conversions на главной и /audio-converter
 
-### Заглушки (нужно сделать) 🔲
-- /audio-speed-changer — изменение скорости
+### Все инструменты готовы ✅
 
 ---
 
 ## Следующий шаг
-/volume-booster или /audio-merger
+SEO улучшения, новые инструменты или монетизация (AdSense)
