@@ -201,17 +201,6 @@ export default function VolumeBooster() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
         </svg>
         <span className="flex-1 text-sm text-foreground truncate">{file.name}</span>
-        {/* Preview button */}
-        <button
-          onClick={togglePreview}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors shrink-0"
-        >
-          {isPreviewing ? (
-            <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Stop</>
-          ) : (
-            <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Preview</>
-          )}
-        </button>
         <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-1" aria-label="Remove">×</button>
       </div>
 
@@ -235,12 +224,51 @@ export default function VolumeBooster() {
           max={MAX_VOL}
           step={STEP}
           value={volume}
-          onChange={(e) => setVolume(Number(e.target.value))}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setVolume(v);
+            // Live preview: restart with new gain if already playing
+            if (isPreviewing) {
+              try { sourceRef.current?.stop(); } catch {}
+              sourceRef.current = null;
+              setIsPreviewing(false);
+              // small delay so state settles, then restart
+              setTimeout(() => {
+                const raw = audioDataRef.current;
+                if (!raw || !audioCtxRef.current) return;
+                audioCtxRef.current.decodeAudioData(raw.slice(0)).then((audioBuffer) => {
+                  const ctx = audioCtxRef.current!;
+                  const gain = ctx.createGain();
+                  gain.gain.value = v / 100;
+                  gain.connect(ctx.destination);
+                  const source = ctx.createBufferSource();
+                  source.buffer = audioBuffer;
+                  source.connect(gain);
+                  source.start();
+                  source.onended = () => { setIsPreviewing(false); sourceRef.current = null; };
+                  sourceRef.current = source;
+                  setIsPreviewing(true);
+                });
+              }, 50);
+            }
+          }}
           className="w-full accent-violet-500 cursor-pointer"
         />
 
-        {/* Hint line */}
-        <p className={`text-xs font-medium ${hintColor}`}>{hintText}</p>
+        {/* Hint + Preview link */}
+        <div className="flex items-center justify-between">
+          <p className={`text-xs font-medium ${hintColor}`}>{hintText}</p>
+          <button
+            onClick={togglePreview}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isPreviewing ? (
+              <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Stop</>
+            ) : (
+              <><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Preview</>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Progress */}
