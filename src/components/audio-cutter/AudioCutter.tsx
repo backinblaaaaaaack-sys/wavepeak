@@ -1,0 +1,351 @@
+"use client";
+
+import { useRef, useState, useCallback, useEffect } from "react";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { Progress } from "@/components/ui/progress";
+
+const ACCEPT = ".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus";
+type Status = "idle" | "loading-ffmpeg" | "converting" | "done" | "error";
+
+// Format seconds as m:ss
+function fmt(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+// Draw waveform on canvas, highlight selected region in violet
+function drawWaveform(
+  canvas: HTMLCanvasElement,
+  peaks: Float32Array,
+  startRatio: number,
+  endRatio: number
+) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const { width: W, height: H } = canvas;
+  ctx.clearRect(0, 0, W, H);
+
+  const mid = H / 2;
+  const barW = 2;
+  const gap = 1;
+  const step = barW + gap;
+  const count = Math.floor(W / step);
+
+  for (let i = 0; i < count; i++) {
+    const ratio = i / count;
+    const peakIdx = Math.floor(ratio * peaks.length);
+    const amp = peaks[peakIdx] * mid * 0.9;
+    const x = i * step;
+
+    const inRange = ratio >= startRatio && ratio <= endRatio;
+    ctx.fillStyle = inRange ? "#7c3aed" : "#3f3f46";
+    ctx.fillRect(x, mid - amp, barW, amp * 2 || 1);
+  }
+}
+
+// Downsample AudioBuffer channel data to N peaks
+function extractPeaks(buffer: AudioBuffer, count: number): Float32Array {
+  const data = buffer.getChannelData(0);
+  const blockSize = Math.floor(data.length / count);
+  const peaks = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    let max = 0;
+    const start = i * blockSize;
+    for (let j = 0; j < blockSize; j++) {
+      const v = Math.abs(data[start + j]);
+      if (v > max) max = v;
+    }
+    peaks[i] = max;
+  }
+  return peaks;
+}
+
+export default function AudioCutter() {
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const peaksRef = useRef<Float32Array | null>(null);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [duration, setDuration] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const [status, setStatus] = useState<Status>("idle");
+  const [progress, setProgress] = useState(0);
+  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [outputName, setOutputName] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  // Redraw whenever handles change
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const peaks = peaksRef.current;
+    if (!canvas || !peaks || duration === 0) return;
+    drawWaveform(canvas, peaks, startTime / duration, endTime / duration);
+  }, [startTime, endTime, duration]);
+
+  const loadFile = useCallback(async (f: File) => {
+    setFile(f);
+    setStatus("idle");
+    setOutputUrl(null);
+    setProgress(0);
+
+    // Decode audio for waveform
+    const arrayBuffer = await f.arrayBuffer();
+    const audioCtx = new AudioContext();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    const dur = audioBuffer.duration;
+
+    const canvas = canvasRef.current;
+    const peaks = extractPeaks(audioBuffer, canvas ? canvas.width / 3 : 400);
+    peaksRef.current = peaks;
+
+    setDuration(dur);
+    setStartTime(0);
+    setEndTime(dur);
+
+    if (canvas) drawWaveform(canvas, peaks, 0, 1);
+    await audioCtx.close();
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  }, [loadFile]);
+
+  const loadFFmpeg = async () => {
+    if (ffmpegRef.current) return ffmpegRef.current;
+    const ffmpeg = new FFmpeg();
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+    ffmpegRef.current = ffmpeg;
+    return ffmpeg;
+  };
+
+  const cut = async () => {
+    if (!file) return;
+    setStatus("loading-ffmpeg");
+    setProgress(0);
+
+    try {
+      const ffmpeg = await loadFFmpeg();
+      setStatus("converting");
+
+      ffmpeg.on("progress", ({ progress: p }) => {
+        setProgress(Math.round(p * 100));
+      });
+
+      const inputName = file.name.replace(/\s/g, "_");
+      const ext = inputName.split(".").pop() ?? "mp3";
+      const outName = inputName.replace(/\.[^.]+$/, "") + `_cut.${ext}`;
+      setOutputName(outName);
+
+      await ffmpeg.writeFile(inputName, await fetchFile(file));
+      await ffmpeg.exec([
+        "-ss", String(startTime.toFixed(3)),
+        "-to", String(endTime.toFixed(3)),
+        "-i", inputName,
+        outName,
+      ]);
+
+      const data = await ffmpeg.readFile(outName) as Uint8Array;
+      const blob = new Blob([data.buffer as ArrayBuffer], { type: file.type });
+      setOutputUrl(URL.createObjectURL(blob));
+      setStatus("done");
+      setProgress(100);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const reset = () => {
+    setFile(null);
+    setDuration(0);
+    setStartTime(0);
+    setEndTime(0);
+    setStatus("idle");
+    setOutputUrl(null);
+    setOutputName("");
+    setProgress(0);
+    peaksRef.current = null;
+  };
+
+  const busy = status === "loading-ffmpeg" || status === "converting";
+
+  // — Result screen —
+  if (status === "done" && outputUrl) {
+    return (
+      <div className="flex flex-col items-center gap-6 rounded-2xl border border-border/60 bg-card px-8 py-12 text-center">
+        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/15">
+          <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground mb-1">Ready to download</p>
+          <p className="font-semibold text-foreground">{outputName}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {fmt(startTime)} → {fmt(endTime)}
+          </p>
+        </div>
+        <a
+          href={outputUrl}
+          download={outputName}
+          className="w-full py-3.5 rounded-xl text-sm font-semibold text-center
+            bg-violet-600 text-white hover:bg-violet-500 transition-colors duration-200"
+        >
+          Download
+        </a>
+        <button
+          onClick={reset}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Cut another file
+        </button>
+      </div>
+    );
+  }
+
+  // — Waveform + controls —
+  if (file && duration > 0) {
+    return (
+      <div className="flex flex-col gap-5">
+        {/* Compact file row */}
+        <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
+          <svg className="w-4 h-4 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+          <span className="flex-1 text-sm text-foreground truncate">{file.name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{fmt(duration)}</span>
+          <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none ml-1" aria-label="Remove file">×</button>
+        </div>
+
+        {/* Waveform canvas */}
+        <div className="rounded-xl overflow-hidden border border-border/60 bg-zinc-900">
+          <canvas
+            ref={canvasRef}
+            width={640}
+            height={96}
+            className="w-full h-24"
+          />
+        </div>
+
+        {/* Dual range sliders */}
+        <div className="flex flex-col gap-3">
+          {/* Start */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground w-10 shrink-0">Start</span>
+            <input
+              type="range"
+              min={0}
+              max={duration}
+              step={0.01}
+              value={startTime}
+              onChange={(e) => {
+                const v = Math.min(Number(e.target.value), endTime - 0.1);
+                setStartTime(v);
+              }}
+              className="flex-1 accent-violet-500 cursor-pointer"
+            />
+            <span className="text-sm font-mono text-foreground w-10 text-right shrink-0">
+              {fmt(startTime)}
+            </span>
+          </div>
+
+          {/* End */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground w-10 shrink-0">End</span>
+            <input
+              type="range"
+              min={0}
+              max={duration}
+              step={0.01}
+              value={endTime}
+              onChange={(e) => {
+                const v = Math.max(Number(e.target.value), startTime + 0.1);
+                setEndTime(v);
+              }}
+              className="flex-1 accent-violet-500 cursor-pointer"
+            />
+            <span className="text-sm font-mono text-foreground w-10 text-right shrink-0">
+              {fmt(endTime)}
+            </span>
+          </div>
+        </div>
+
+        {/* Duration info */}
+        <p className="text-xs text-muted-foreground text-center">
+          Selected: {fmt(endTime - startTime)} of {fmt(duration)}
+        </p>
+
+        {/* Progress */}
+        {busy && (
+          <div className="flex flex-col gap-2">
+            <Progress value={status === "loading-ffmpeg" ? null : progress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-right">
+              {status === "loading-ffmpeg" ? "Loading engine…" : `${progress}%`}
+            </p>
+          </div>
+        )}
+
+        {/* Error */}
+        {status === "error" && (
+          <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
+        )}
+
+        {/* Cut button */}
+        <button
+          onClick={cut}
+          disabled={busy}
+          className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-200
+            bg-violet-600 text-white hover:bg-violet-500 active:scale-[0.99]
+            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-violet-600"
+        >
+          {status === "loading-ffmpeg"
+            ? "Loading FFmpeg…"
+            : status === "converting"
+            ? `Cutting… ${progress}%`
+            : `Cut ${fmt(startTime)} → ${fmt(endTime)}`}
+        </button>
+      </div>
+    );
+  }
+
+  // — Drop zone —
+  return (
+    <label
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      className={`relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed px-8 py-20 cursor-pointer transition-all duration-200
+        ${dragging
+          ? "border-violet-500 bg-violet-500/10 scale-[1.01]"
+          : "border-border hover:border-violet-400 hover:bg-violet-500/5"
+        }`}
+    >
+      <input
+        type="file"
+        accept={ACCEPT}
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])}
+      />
+      <div className={`flex items-center justify-center w-16 h-16 rounded-full transition-colors ${dragging ? "bg-violet-500/20" : "bg-muted"}`}>
+        <svg className={`w-7 h-7 transition-colors ${dragging ? "text-violet-400" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+      </div>
+      <div className="text-center">
+        <p className="text-base font-semibold text-foreground">
+          {dragging ? "Drop your file here" : "Drag & drop or click to browse"}
+        </p>
+        <p className="text-sm text-muted-foreground mt-1">MP3 · WAV · FLAC · M4A · AAC · OGG · OPUS</p>
+      </div>
+    </label>
+  );
+}
