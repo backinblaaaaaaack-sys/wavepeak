@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/ogg-to-wav' },
+  alternates: { canonical: 'https://wavepeak.app/ogg-to-wav' },
   title: "OGG to WAV Converter Online Free | Wavepeak",
   description: "Convert OGG to WAV online for free. Works in your browser — no upload, no server.",
   openGraph: {
     title: "OGG to WAV Converter Online Free | Wavepeak",
     description: "Convert OGG to WAV online for free. No upload required.",
-    url: "https://wavepeak-iota.vercel.app/ogg-to-wav",
+    url: "https://wavepeak.app/ogg-to-wav",
     siteName: "Wavepeak",
     type: "website",
   },

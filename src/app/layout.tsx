@@ -8,13 +8,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://wavepeak-iota.vercel.app"),
+  metadataBase: new URL("https://wavepeak.app"),
   title: "Wavepeak — Free Online Audio Tools",
   description: "Convert, cut, merge and enhance audio files directly in your browser. No upload, no server. Free online audio tools.",
   openGraph: {
     title: "Wavepeak — Free Online Audio Tools",
     description: "Convert, cut, merge and enhance audio files directly in your browser. No upload, no server.",
-    url: "https://wavepeak-iota.vercel.app",
+    url: "https://wavepeak.app",
     siteName: "Wavepeak",
     type: "website",
   },

@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/ogg-to-flac' },
+  alternates: { canonical: 'https://wavepeak.app/ogg-to-flac' },
   title: "OGG to FLAC Converter Online Free | Wavepeak",
   description: "Convert OGG to FLAC online for free. Works in your browser — no upload, no server.",
   openGraph: {
     title: "OGG to FLAC Converter Online Free | Wavepeak",
     description: "Convert OGG to FLAC online for free. No upload required.",
-    url: "https://wavepeak-iota.vercel.app/ogg-to-flac",
+    url: "https://wavepeak.app/ogg-to-flac",
     siteName: "Wavepeak",
     type: "website",
   },

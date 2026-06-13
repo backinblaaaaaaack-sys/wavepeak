@@ -1,7 +1,7 @@
 import { type MetadataRoute } from "next";
 import { CONVERSION_PAIRS } from "@/lib/converters";
 
-const BASE = "https://wavepeak-iota.vercel.app";
+const BASE = "https://wavepeak.app";
 
 const TOOLS = [
   "/audio-converter",

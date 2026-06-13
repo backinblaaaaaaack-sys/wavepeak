@@ -19,13 +19,13 @@ const faq = [
 ];
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-merger' },
+  alternates: { canonical: 'https://wavepeak.app/audio-merger' },
   title: "Audio Merger Online Free — Combine Multiple Audio Files | Wavepeak",
   description: "Merge and combine multiple audio files into one online for free. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS. Works in your browser — no upload, no server.",
   openGraph: {
     title: "Audio Merger Online Free — Combine Multiple Audio Files | Wavepeak",
     description: "Merge multiple audio files into one online for free. No upload required.",
-    url: "https://wavepeak-iota.vercel.app/audio-merger",
+    url: "https://wavepeak.app/audio-merger",
     siteName: "Wavepeak",
     type: "website",
   },

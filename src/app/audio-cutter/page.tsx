@@ -5,13 +5,13 @@ import HowItWorks from "@/components/seo/HowItWorks";
 import FAQ from "@/components/seo/FAQ";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-cutter' },
+  alternates: { canonical: 'https://wavepeak.app/audio-cutter' },
   title: "Audio Cutter Online Free — Trim & Cut Any Audio File | Wavepeak",
   description: "Cut and trim any audio file online for free. Works in your browser — no upload, no server. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS.",
   openGraph: {
     title: "Audio Cutter Online Free — Trim & Cut Any Audio File | Wavepeak",
     description: "Cut and trim any audio file online for free. No upload required. Supports all major formats.",
-    url: "https://wavepeak-iota.vercel.app/audio-cutter",
+    url: "https://wavepeak.app/audio-cutter",
     siteName: "Wavepeak",
     type: "website",
   },

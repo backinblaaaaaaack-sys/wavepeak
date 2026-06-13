@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/wav-to-aac' },
+  alternates: { canonical: 'https://wavepeak.app/wav-to-aac' },
   title: "WAV to AAC Converter Online Free | Wavepeak",
   description: "Convert WAV to AAC online for free. Works in your browser — no upload, no server.",
   openGraph: {
     title: "WAV to AAC Converter Online Free | Wavepeak",
     description: "Convert WAV to AAC online for free. No upload required.",
-    url: "https://wavepeak-iota.vercel.app/wav-to-aac",
+    url: "https://wavepeak.app/wav-to-aac",
     siteName: "Wavepeak",
     type: "website",
   },

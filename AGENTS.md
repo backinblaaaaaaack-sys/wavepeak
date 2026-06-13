@@ -2,7 +2,7 @@
 
 ## Проект
 Wavepeak — платформа с онлайн аудио инструментами (конвертеры, обрезка, усилитель громкости и т.д.).
-Сайт: https://wavepeak-iota.vercel.app
+Сайт: https://wavepeak.app
 Репо: https://github.com/backinblaaaaaaack-sys/wavepeak
 
 ## Стек

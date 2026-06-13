@@ -31,13 +31,13 @@ const faq = [
 ];
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/ringtone-maker' },
+  alternates: { canonical: 'https://wavepeak.app/ringtone-maker' },
   title: "Ringtone Maker Online Free — Create Ringtones from Any Song | Wavepeak",
   description: "Create ringtones from any song online for free. Export as M4R for iPhone or MP3 for Android. Works in your browser — no upload, no server.",
   openGraph: {
     title: "Ringtone Maker Online Free — Create Ringtones from Any Song | Wavepeak",
     description: "Create ringtones from any song. Export as M4R for iPhone or MP3 for Android. Free, no upload.",
-    url: "https://wavepeak-iota.vercel.app/ringtone-maker",
+    url: "https://wavepeak.app/ringtone-maker",
     siteName: "Wavepeak",
     type: "website",
   },

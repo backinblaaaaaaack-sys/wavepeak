@@ -19,13 +19,13 @@ const faq = [
 ];
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/volume-booster' },
+  alternates: { canonical: 'https://wavepeak.app/volume-booster' },
   title: "Volume Booster Online Free — Increase Audio Volume Up to 500% | Wavepeak",
   description: "Boost the volume of any audio file online for free — up to 500%. Works in your browser, no upload required. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS.",
   openGraph: {
     title: "Volume Booster Online Free — Increase Audio Volume Up to 500% | Wavepeak",
     description: "Boost audio volume up to 500% online for free. No upload, works in browser.",
-    url: "https://wavepeak-iota.vercel.app/volume-booster",
+    url: "https://wavepeak.app/volume-booster",
     siteName: "Wavepeak",
     type: "website",
   },

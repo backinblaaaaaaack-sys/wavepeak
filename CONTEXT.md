@@ -3,7 +3,7 @@
 ## Что такое Wavepeak
 Платформа с бесплатными онлайн аудио инструментами.
 Целевой рынок: англоязычный (EN), монетизация через AdSense + Freemium.
-Сайт: https://wavepeak-iota.vercel.app
+Сайт: https://wavepeak.app
 Репо: https://github.com/backinblaaaaaaack-sys/wavepeak
 
 ## Стек

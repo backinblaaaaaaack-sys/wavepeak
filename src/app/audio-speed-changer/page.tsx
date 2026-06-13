@@ -19,13 +19,13 @@ const faq = [
 ];
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-speed-changer' },
+  alternates: { canonical: 'https://wavepeak.app/audio-speed-changer' },
   title: "Audio Speed Changer Online Free — Speed Up or Slow Down Any Audio | Wavepeak",
   description: "Change the speed of any audio file online for free. Speed up or slow down without changing the pitch. Supports MP3, WAV, FLAC, M4A, AAC, OGG, OPUS. Works in your browser.",
   openGraph: {
     title: "Audio Speed Changer Online Free — Speed Up or Slow Down Any Audio | Wavepeak",
     description: "Speed up or slow down any audio file online for free. No pitch change, no upload required.",
-    url: "https://wavepeak-iota.vercel.app/audio-speed-changer",
+    url: "https://wavepeak.app/audio-speed-changer",
     siteName: "Wavepeak",
     type: "website",
   },

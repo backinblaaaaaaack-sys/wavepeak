@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import PopularConversions from "@/components/popular-conversions/PopularConversions";
 
 export const metadata: Metadata = {
-  alternates: { canonical: "https://wavepeak-iota.vercel.app" },
+  alternates: { canonical: "https://wavepeak.app" },
 };
 
 const tools = [

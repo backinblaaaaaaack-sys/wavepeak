@@ -4,13 +4,13 @@ import HowItWorks from "@/components/seo/HowItWorks";
 import FAQ from "@/components/seo/FAQ";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/audio-converter' },
+  alternates: { canonical: 'https://wavepeak.app/audio-converter' },
   title: "Audio Converter Online Free — Convert Any Audio Format | Wavepeak",
   description: "Convert any audio format online for free. MP3, WAV, FLAC, M4A, AAC, OGG, OPUS — all supported. Works in your browser, no upload required.",
   openGraph: {
     title: "Audio Converter Online Free | Wavepeak",
     description: "Convert any audio format online. MP3, WAV, FLAC, M4A, AAC, OGG, OPUS. Free, fast, no upload.",
-    url: "https://wavepeak-iota.vercel.app/audio-converter",
+    url: "https://wavepeak.app/audio-converter",
     siteName: "Wavepeak",
     type: "website",
   },

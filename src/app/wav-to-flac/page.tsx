@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/wav-to-flac' },
+  alternates: { canonical: 'https://wavepeak.app/wav-to-flac' },
   title: "WAV to FLAC Converter Online Free | Wavepeak",
   description: "Convert WAV to FLAC online for free. Works in your browser — no upload, no server.",
   openGraph: {
     title: "WAV to FLAC Converter Online Free | Wavepeak",
     description: "Convert WAV to FLAC online for free. No upload required.",
-    url: "https://wavepeak-iota.vercel.app/wav-to-flac",
+    url: "https://wavepeak.app/wav-to-flac",
     siteName: "Wavepeak",
     type: "website",
   },

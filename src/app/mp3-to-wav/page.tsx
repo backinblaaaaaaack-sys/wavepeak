@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/mp3-to-wav' },
+  alternates: { canonical: 'https://wavepeak.app/mp3-to-wav' },
   title: "MP3 to WAV Converter Online Free | Wavepeak",
   description: "Convert MP3 to WAV online for free. Lossless output, works in your browser — no upload, no server.",
   openGraph: {
     title: "MP3 to WAV Converter Online Free | Wavepeak",
     description: "Convert MP3 to WAV online. Lossless output, works in browser, no upload required.",
-    url: "https://wavepeak-iota.vercel.app/mp3-to-wav",
+    url: "https://wavepeak.app/mp3-to-wav",
     siteName: "Wavepeak",
     type: "website",
   },

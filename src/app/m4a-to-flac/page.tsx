@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import ConverterPage from "@/components/audio-converter/ConverterPage";
 
 export const metadata: Metadata = {
-  alternates: { canonical: 'https://wavepeak-iota.vercel.app/m4a-to-flac' },
+  alternates: { canonical: 'https://wavepeak.app/m4a-to-flac' },
   title: "M4A to FLAC Converter Online Free | Wavepeak",
   description: "Convert M4A to FLAC online for free. Works in your browser — no upload, no server.",
   openGraph: {
     title: "M4A to FLAC Converter Online Free | Wavepeak",
     description: "Convert M4A to FLAC online for free. No upload required.",
-    url: "https://wavepeak-iota.vercel.app/m4a-to-flac",
+    url: "https://wavepeak.app/m4a-to-flac",
     siteName: "Wavepeak",
     type: "website",
   },
